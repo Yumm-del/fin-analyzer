@@ -18,7 +18,7 @@
 
 ```bash
 # 1. 克隆仓库
-git clone [仓库地址]
+git clone https://gitee.com/yumm-del--pure-delight/fin-analyzer.git
 cd fin-analyzer
 
 # 2. 安装依赖
