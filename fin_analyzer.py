@@ -102,12 +102,8 @@ def _get_api_key() -> str:
             if api_key:
                 return api_key
 
-    # 未找到 API Key — 打印指引并返回空字符串
-    # 不在此处做交互式输入：保持代码简洁，适合作为展示项目
-    print("\n⚠️  未找到 DeepSeek API Key。")
-    print("   配置方法：在项目根目录创建 .env 文件，写入：")
-    print("   DEEPSEEK_API_KEY=你的密钥")
-    print("   获取地址：https://platform.deepseek.com（免费注册即送额度）")
+    # 未找到 API Key — 静默返回空字符串
+    # 配置方法已写在 README 中，无需在代码层重复提示
     return ""
 
 
