@@ -28,7 +28,13 @@ pip install -r requirements.txt
 python fin_analyzer.py
 ```
 
-首次运行会提示输入 DeepSeek API Key（获取地址：https://platform.deepseek.com），可选择保存到 `.env` 文件，下次自动读取。
+首次运行前，在项目根目录创建 `.env` 文件：
+
+```
+DEEPSEEK_API_KEY=你的密钥
+```
+
+获取地址：https://platform.deepseek.com（免费注册即送额度）
 
 ---
 

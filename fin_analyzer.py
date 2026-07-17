@@ -102,22 +102,12 @@ def _get_api_key() -> str:
             if api_key:
                 return api_key
 
-    # 方法 3：交互式输入
-    print("\n🔑 未找到 DeepSeek API Key。")
-    print("   如果你还没有，去 https://platform.deepseek.com 注册获取（免费）。")
-    api_key = input("   请输入你的 DeepSeek API Key → ").strip()
-
-    if api_key:
-        # 询问是否保存
-        save = input("   是否保存到 .env 文件以便下次使用？(y/n) → ").strip().lower()
-        if save == "y":
-            env_path = os.path.join(os.path.dirname(__file__), ".env")
-            with open(env_path, "w", encoding="utf-8") as f:
-                f.write(f"DEEPSEEK_API_KEY={api_key}")
-            print(f"   ✅ 已保存到 {env_path}")
-        return api_key
-
-    print("❌ 未提供 API Key，LLM 分析功能不可用。")
+    # 未找到 API Key — 打印指引并返回空字符串
+    # 不在此处做交互式输入：保持代码简洁，适合作为展示项目
+    print("\n⚠️  未找到 DeepSeek API Key。")
+    print("   配置方法：在项目根目录创建 .env 文件，写入：")
+    print("   DEEPSEEK_API_KEY=你的密钥")
+    print("   获取地址：https://platform.deepseek.com（免费注册即送额度）")
     return ""
 
 
