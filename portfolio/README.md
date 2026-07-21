@@ -7,6 +7,7 @@
 ## 🤖 项目作品
 
 - [fin-analyzer — AI 金融分析 Agent](https://gitee.com/yumm-del--pure-delight/fin-analyzer)
+- [stock-analyzer — A 股行业分析工具](https://gitee.com/yumm-del--pure-delight/stock-analyzer)
 - [tarot-cli — 命令行交互产品](https://gitee.com/yumm-del--pure-delight/tarot-cli)
 
 ---
