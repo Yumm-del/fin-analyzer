@@ -13,11 +13,13 @@
 
 ## 📊 AI 产品深度体验报告
 
-- [DeepSeek 深度体验报告](./DeepSeek%20深度体验报告.pdf)
-- [豆包 深度体验报告](./豆包%20深度体验报告.pdf)
-- [通义千问 深度体验报告](./通义千问%20深度体验报告.pdf)
-- [腾讯元宝 深度体验报告](./腾讯元宝%20深度体验报告.pdf)
-- [Kimi 深度体验报告](./Kimi%20深度体验报告.pdf)
+> 点击「下载 PDF」直接查看，无需登录。如需一份完整总览，[下载作品集总览 PDF](https://gitee.com/yumm-del--pure-delight/fin-analyzer/raw/master/portfolio/Yumm-del%20%C2%B7%20AI%20%E4%BA%A7%E5%93%81%E4%BD%9C%E5%93%81%E9%9B%86.pdf)
+
+- DeepSeek 深度体验报告：[下载 PDF](https://gitee.com/yumm-del--pure-delight/fin-analyzer/raw/master/portfolio/DeepSeek%20深度体验报告.pdf)
+- 豆包 深度体验报告：[下载 PDF](https://gitee.com/yumm-del--pure-delight/fin-analyzer/raw/master/portfolio/豆包%20深度体验报告.pdf)
+- 通义千问 深度体验报告：[下载 PDF](https://gitee.com/yumm-del--pure-delight/fin-analyzer/raw/master/portfolio/通义千问%20深度体验报告.pdf)
+- 腾讯元宝 深度体验报告：[下载 PDF](https://gitee.com/yumm-del--pure-delight/fin-analyzer/raw/master/portfolio/腾讯元宝%20深度体验报告.pdf)
+- Kimi 深度体验报告：[下载 PDF](https://gitee.com/yumm-del--pure-delight/fin-analyzer/raw/master/portfolio/Kimi%20深度体验报告.pdf)
 
 ---
 
