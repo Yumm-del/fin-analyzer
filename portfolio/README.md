@@ -4,6 +4,12 @@
 
 ---
 
+## 📋 PRD 示例
+
+- [fin-analyzer 产品需求文档 — 完整 PRD 示例](./fin-analyzer-PRD.md)
+
+---
+
 ## 🤖 项目作品
 
 - [fin-analyzer — AI 金融分析 Agent](https://gitee.com/yumm-del--pure-delight/fin-analyzer)
