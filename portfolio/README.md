@@ -6,7 +6,9 @@
 
 ## 📋 PRD 示例
 
-- [fin-analyzer 产品需求文档 — 完整 PRD 示例](./fin-analyzer-PRD.md)
+- [fin-analyzer 产品需求文档](./fin-analyzer-PRD.md) — AI 金融分析 Agent
+- [stock-analyzer 产品需求文档](https://gitee.com/yumm-del--pure-delight/stock-analyzer/blob/master/portfolio/stock-analyzer-PRD.md) — A 股行业分析工具
+- [tarot-cli 产品需求文档](https://gitee.com/yumm-del--pure-delight/tarot-cli/blob/master/portfolio/tarot-cli-PRD.md) — 命令行塔罗牌工具
 
 ---
 
