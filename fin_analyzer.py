@@ -26,11 +26,28 @@ AI 金融分析 Agent v0.1 ———— 基础版（单次搜索 + LLM 分析）
 
 import os
 import sys
+import io
 import json
 import time
 from datetime import datetime
 from dataclasses import dataclass, asdict, field
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ——— 修复 Windows GBK 编码问题 ———
+# Python 在 Windows 中文系统上默认用 GBK 编码 stdout，
+# 导致 emoji（✅⚠️❌等）输出时报 UnicodeEncodeError。
+# 这里在模块加载时把 stdout/stderr 强制设为 UTF-8（兼容 CLI 和 Web）。
+if hasattr(sys.stdout, 'buffer') and sys.stdout.encoding:
+    if sys.stdout.encoding.lower() in ('gbk', 'gb2312', 'gb18030', 'cp936'):
+        try:
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer, encoding='utf-8', errors='replace'
+            )
+            sys.stderr = io.TextIOWrapper(
+                sys.stderr.buffer, encoding='utf-8', errors='replace'
+            )
+        except Exception:
+            pass
 
 # ——— 搜索相关 ———
 # 用 requests 直接访问 DuckDuckGo HTML 页面，不依赖第三方搜索库
@@ -151,9 +168,117 @@ class AnalysisReport:
 #   · 对于公司基本面/新闻这类公开信息，DuckDuckGo 完全够用
 
 
+def search_bing(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[SearchResult]:
+    """
+    在 Bing（必应）上搜索指定关键词。
+
+    为什么加 Bing？
+      DuckDuckGo 在国内经常被墙，但 cn.bing.com 在国内可以正常访问。
+      Bing 是微软的搜索引擎，对中文搜索支持很好，
+      而且搜索结果时效性高（会标注"1天前""3小时前"等）。
+
+    原理：
+      直接 HTTP GET 请求 cn.bing.com，解析 HTML 提取搜索结果。
+      和 DuckDuckGo 搜索器一样，用正则解析，零额外依赖。
+
+    参数：
+        query: 搜索关键词（支持中文）
+        max_results: 最多返回几条结果
+
+    返回值：
+        list[SearchResult] — 搜索结果列表
+    """
+    results: list[SearchResult] = []
+    url = "https://cn.bing.com/search"
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "zh-CN,zh;q=0.9",
+    }
+
+    try:
+        response = requests.get(
+            url,
+            params={"q": query, "count": max_results},
+            headers=headers,
+            timeout=SEARCH_TIMEOUT,
+        )
+
+        if response.status_code != 200:
+            print(f"   ⚠️  Bing 返回 {response.status_code}，回退到 DuckDuckGo")
+            return results
+
+        html = response.text
+
+        # Bing 的搜索结果在 <li class="b_algo"> 里
+        # 每个 b_algo 包含：<a href="...">标题</a> 和 <p>摘要</p>
+        algo_pattern = re.compile(
+            r'<li class="b_algo"[^>]*>(.*?)</li>',
+            re.DOTALL,
+        )
+        blocks = algo_pattern.findall(html)
+
+        for block in blocks:
+            if len(results) >= max_results:
+                break
+
+            # 提取链接和标题
+            link_match = re.search(
+                r'<a[^>]*href="(https?://[^"]*)"[^>]*>(.*?)</a>',
+                block, re.DOTALL,
+            )
+            if not link_match:
+                continue
+
+            href = link_match.group(1)
+            # 标题中可能有 HTML 标签，去掉
+            title = re.sub(r'<[^>]+>', '', link_match.group(2)).strip()
+
+            # 跳过非 http 链接和 Bing 自身的链接
+            if not href.startswith("http") or "bing.com" in href:
+                continue
+
+            # 提取摘要（<p> 标签中的文字）
+            snippet_match = re.search(r'<p[^>]*>(.*?)</p>', block, re.DOTALL)
+            snippet = ""
+            if snippet_match:
+                # 去掉 HTML 实体和标签
+                raw = snippet_match.group(1)
+                raw = raw.replace("&ensp;", " ").replace("&#0183;", "·")
+                snippet = re.sub(r'<[^>]+>', '', raw).strip()
+
+            if title and href:
+                results.append(SearchResult(
+                    title=title,
+                    href=href,
+                    body=snippet,
+                ))
+
+        if results:
+            print(f"   ✅ Bing 搜索完成: {query[:40]}... ({len(results)} 条结果)")
+
+    except requests.exceptions.Timeout:
+        print(f"   ⏱️  Bing 搜索超时，回退到 DuckDuckGo")
+    except requests.exceptions.ConnectionError:
+        print(f"   🔌 Bing 连接失败，回退到 DuckDuckGo")
+    except Exception as e:
+        print(f"   ⚠️  Bing 搜索异常: {e}")
+
+    return results
+
+
 def search_web(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[SearchResult]:
     """
-    在 DuckDuckGo 上搜索指定关键词。
+    搜索指定关键词 — 优先使用 Bing（国内可用），失败时回退到 DuckDuckGo。
+
+    搜索策略（PM 视角）：
+      1. 先试 Bing ———— 国内网络可用，时效性高
+      2. Bing 失败 → DuckDuckGo ———— 作为备用
+      3. 都失败 → 返回空列表 ———— LLM 用训练数据分析（优雅降级）
 
     参数：
         query: 搜索关键词（支持中文）
@@ -173,6 +298,14 @@ def search_web(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Search
         · 直接用 HTTP 请求 DuckDuckGo HTML 页面，稳定性好很多
         · 加了 3 个备用域名，一个挂了自动切下一个
     """
+    results: list[SearchResult] = []
+
+    # ——— 优先使用 Bing（国内可用） ———
+    bing_results = search_bing(query, max_results)
+    if bing_results:
+        return bing_results
+
+    # ——— Bing 失败，回退到 DuckDuckGo ———
     results: list[SearchResult] = []
 
     # DuckDuckGo 的 HTML 端点（不需要 JS 渲染）
