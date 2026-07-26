@@ -357,15 +357,25 @@ def render_analyze_page():
     st.title("🔍 AI 金融分析")
 
     # ——— 输入区 ———
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([3, 1, 1])
     with col1:
         company = st.text_input(
             "输入公司名称或股票代码",
-            placeholder="例如：比亚迪、宁德时代、 Apple、TSLA……",
+            placeholder="例如：比亚迪、宁德时代、Apple、TSLA……",
             label_visibility="collapsed",
             key="company_input",
         )
     with col2:
+        # 快速模式：跳过搜索，直接用 LLM 训练数据分析
+        # 在国内 DuckDuckGo 常被墙，开启此模式可节省 ~15-30s 的超时等待
+        fast_mode = st.checkbox(
+            "⚡ 快速模式",
+            value=True,
+            help="跳过网络搜索，直接用 LLM 训练数据分析。\n"
+                 "国内网络环境下建议开启，可节省 15-30 秒。\n"
+                 "LLM 训练数据截止到 2025 年底，时效性略差。"
+        )
+    with col3:
         analyze_clicked = st.button(
             "🚀 开始分析",
             type="primary",
@@ -394,20 +404,24 @@ def render_analyze_page():
 
     # ——— 分析流程 ———
     if analyze_clicked and company:
-        execute_analysis(company)
+        execute_analysis(company, fast_mode)
     elif analyze_clicked and not company:
         st.warning("请输入公司名称或股票代码。")
 
 
-def execute_analysis(company: str):
+def execute_analysis(company: str, fast_mode: bool = True):
     """
     执行完整的分析流程：搜索 → LLM 分析 → 展示 → 保存。
 
-    这是整个产品最核心的流程。用 st.status 组件展示多步骤进度，
-    比简单的 spinner 更能给用户「掌控感」。
+    参数：
+        company: 公司名称
+        fast_mode: True = 跳过网络搜索，直接用 LLM 训练数据分析（快 15-30s）
 
-    PM 思考：进度透明度直接影响用户等待体验 ——
-    用户知道系统「正在做什么」比看到「请等待」更有耐心。
+    PM 思考：
+        DuckDuckGo 在国内经常不可用，每次搜索超时浪费用户时间。
+        与其让用户干等，不如默认开启"快速模式"跳过搜索，
+        让 LLM 用训练数据直接分析——牺牲一点时效性，换来流畅的体验。
+        用户需要最新信息时可以关掉快速模式。
     """
     # 同步 API Key 到 fin_analyzer 模块（CLI 版从环境变量读，
     # Web 版需要从 session_state / secrets 注入）
@@ -415,14 +429,22 @@ def execute_analysis(company: str):
 
     # 用 st.status 替代 st.spinner，展示多步骤进度
     with st.status(f"正在分析「{company}」……", expanded=True) as status:
-        # ——— Step 1: 并行搜索 ———
-        st.write("🔍 **搜索网络信息** ——— 基本面 / 最新动态 / 风险……")
-        search_start = time.time()
-        search_results = fa.parallel_search(company)
-        search_duration = time.time() - search_start
+        # ——— Step 1: 搜索（快速模式下跳过） ———
+        if fast_mode:
+            st.write("⚡ **快速模式** ——— 跳过网络搜索，使用 LLM 训练知识")
+            search_results = {"fundamentals": [], "news": [], "risks": []}
+            search_duration = 0
+            total_results = 0
+        else:
+            st.write("🔍 **搜索网络信息** ——— 基本面 / 最新动态 / 风险……")
+            search_start = time.time()
+            search_results = fa.parallel_search(company)
+            search_duration = time.time() - search_start
+            total_results = sum(len(v) for v in search_results.values())
 
-        total_results = sum(len(v) for v in search_results.values())
-        if total_results > 0:
+        if fast_mode:
+            st.write("   ⚡ 使用 LLM 训练数据分析（训练数据截止 2025 年底）")
+        elif total_results > 0:
             st.write(f"   ✅ 搜索完成！耗时 {search_duration:.1f}s，获取 {total_results} 条结果")
         else:
             st.write("   ⚠️ 网络搜索暂不可用，将使用 LLM 训练数据中的知识")

@@ -68,7 +68,7 @@ DEEPSEEK_MODEL = "deepseek-chat"  # V3 模型，性价比最高
 
 # 搜索配置
 SEARCH_MAX_RESULTS = 5  # 每个维度返回的搜索结果数
-SEARCH_TIMEOUT = 10     # 每次搜索超时秒数
+SEARCH_TIMEOUT = 5      # 每次搜索超时秒数（国内网络环境缩短等待时间）
 
 # 报告保存路径（和 tarot-cli 的 JOURNAL_PATH 一样的设计）
 REPORT_DIR = os.path.join(os.path.dirname(__file__), "reports")
