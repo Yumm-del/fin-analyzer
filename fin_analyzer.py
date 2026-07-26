@@ -294,18 +294,23 @@ def _filter_relevant_results(
     返回：
       过滤后的有效结果列表
     """
-    # 明显是垃圾站点的域名黑名单
+    # 明显是垃圾站点的域名（Bing 反爬/质量差时返回的无关内容）
     spam_domains = [
         "worldtimebuddy.com", "qr-code-generator.com", "app-sorteos.com",
         "feimogames.com", "52fhz.com", "hanyuguoxue.com",
     ]
-    # 明显非财经类域名的部分匹配（这些域名大概率返回了不相关内容）
+    # 明显非财经/非公司官网类内容的域名片段
     non_finance_keywords = [
         "github.com", "apple.com/app", "instagram", "youtube",
         "microsoft.com/powerpoint", "google.com/support",
         "taobao.com/list", "bilibili.com", "quark.cn",
         "xueersi.com", "douyin.com", "weixin.qq.com/filehelper",
         "sfr.fr", "aliyun.com", "ru.wikipedia.org",
+        # Bing 经常返回的无关中文内容
+        "zhidao.baidu.com",       # 百度知道（Q&A，非财经）
+        "zhuanlan.zhihu.com",     # 知乎专栏（常为旅游、百科等）
+        "ningde.gov.cn",           # 宁德市政府（不是宁德时代！）
+        "baike.baidu.com/item",   # 百度百科（非财经新闻）
     ]
 
     filtered: list[SearchResult] = []
@@ -876,7 +881,27 @@ def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchRe
     news = format_results(search_results.get("news", []), "最新动态/新闻")
     risks = format_results(search_results.get("risks", []), "风险/负面信息")
 
-    user_prompt = f"""请分析以下公司：**{company}**
+    # 评估外部数据质量
+    total_web_results = sum(len(v) for v in search_results.values())
+    has_financial_data = bool(financial_text and "未获取到" not in financial_text)
+
+    if not has_financial_data and total_web_results == 0:
+        # 两个数据源都不可用 → 纯 LLM 训练知识模式
+        user_prompt = f"""请分析以下公司：**{company}**
+
+⚠️ 注意：当前无法获取该公司的实时行情数据和网络搜索信息。
+请完全基于你的训练知识进行分析，但必须遵守以下规则：
+
+1. 在报告开头明确标注：「⚠️ 数据说明：本次分析基于 AI 训练知识，未获取到实时市场数据。
+   请通过东方财富(eastmoney.com)、巨潮资讯(cninfo.com.cn)等渠道核实最新信息。」
+2. 不要编造具体的财务数字（如"营收1234亿元"）。如果训练知识中有大致数据可以说"约"。
+3. 公司概况、业务描述、行业分析可以使用训练知识。
+4. 风险分析中可以提及行业共性风险，但不要编造具体事件。
+
+请严格按照输出格式要求生成报告。"""
+    else:
+        # 有外部数据 → 数据驱动分析模式
+        user_prompt = f"""请分析以下公司：**{company}**
 
 ## 实时行情数据（来源：东方财富，数据实时更新）
 
