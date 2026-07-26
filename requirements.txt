@@ -1,6 +1,16 @@
-# AI 金融分析 Agent — Python 依赖
+# Fin Analyzer — AI 金融分析 Agent
+# ====================================
 # 安装方式：pip install -r requirements.txt
+#
+# 依赖分为两类：
+#   1. 核心依赖 — CLI 版和 Web 版都需要的
+#   2. Web 依赖 — Streamlit Web 界面额外需要的
 
+# === 核心依赖（CLI + Web 共用） ===
 openai>=1.0.0          # 调用 DeepSeek API（兼容 OpenAI SDK）
-requests>=2.28.0        # HTTP 请求（用于网络搜索）
-python-dotenv>=1.0.0    # 从 .env 文件读取 API key（可选）
+requests>=2.28.0        # HTTP 请求（用于 DuckDuckGo 搜索）
+python-dotenv>=1.0.0    # 从 .env 文件读取 API key
+
+# === Web 依赖（仅 Web 版需要） ===
+streamlit>=1.28.0       # Web UI 框架
+watchdog>=3.0.0         # Streamlit 热重载（开发时用，可选）

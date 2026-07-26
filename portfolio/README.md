@@ -15,6 +15,8 @@
 ## 🤖 项目作品
 
 - [fin-analyzer — AI 金融分析 Agent](https://gitee.com/yumm-del--pure-delight/fin-analyzer)
+  - v0.1: CLI 终端版（Python 命令行交互）
+  - v0.2: **Web 浏览器版**（Streamlit 构建，支持在线使用 / 历史记录 / 报告下载）
 - [stock-analyzer — A 股行业分析工具](https://gitee.com/yumm-del--pure-delight/stock-analyzer)
 - [tarot-cli — 命令行交互产品](https://gitee.com/yumm-del--pure-delight/tarot-cli)
 
