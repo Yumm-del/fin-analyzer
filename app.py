@@ -370,10 +370,9 @@ def render_analyze_page():
         # 在国内 DuckDuckGo 常被墙，开启此模式可节省 ~15-30s 的超时等待
         fast_mode = st.checkbox(
             "⚡ 快速模式",
-            value=True,
-            help="跳过网络搜索，直接用 LLM 训练数据分析。\n"
-                 "国内网络环境下建议开启，可节省 15-30 秒。\n"
-                 "LLM 训练数据截止到 2025 年底，时效性略差。"
+            value=False,
+            help="跳过网络搜索，直接用 LLM 训练数据分析（约快 5-10 秒）。\n"
+                 "不勾选时使用 Bing 搜索实时信息，数据时效性更好。"
         )
     with col3:
         analyze_clicked = st.button(
