@@ -189,7 +189,7 @@ def search_bing(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Searc
         list[SearchResult] — 搜索结果列表
     """
     results: list[SearchResult] = []
-    url = "https://www.bing.com/search"  # 全球 Bing（中文搜索质量优于 cn.bing.com）
+    url = "https://cn.bing.com/search"  # 国内 Bing，中文搜索质量最好
 
     headers = {
         "User-Agent": (
@@ -203,11 +203,7 @@ def search_bing(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Searc
     try:
         response = requests.get(
             url,
-            params={
-                "q": query,
-                "count": max_results,
-                "setlang": "en",       # 使用全球版 Bing，搜索质量更好
-            },
+            params={"q": query, "count": max_results},
             headers=headers,
             timeout=SEARCH_TIMEOUT,
         )
@@ -748,14 +744,12 @@ def parallel_search(company: str) -> dict[str, list[SearchResult]]:
     返回值：
         {"fundamentals": [...], "news": [...], "risks": [...]}
     """
-    # 搜索关键词设计（PM 视角）：
-    #   中英混合搜索——Bing 的中文分词很烂（会把"宁德时代"拆成"宁德"+"时代"），
-    #   但加上英文名/股票代码后就能精准定位。英文术语也能帮 LLM 更好理解上下文。
-    english_hint = _get_english_hint(company)
+    # 搜索关键词：纯中文自然搜索，cn.bing.com 的中文分词靠自然语言理解，
+    # 加了英文反而容易混淆。对于独特名称（如"比亚迪"）效果最好。
     queries = {
-        "fundamentals": f'{company} {english_hint} 财报 营收 净利润 主营业务 2025',
-        "news": f'{company} {english_hint} 最新 新闻 动态 2025 2026',
-        "risks": f'{company} {english_hint} 风险 亏损 诉讼 争议',
+        "fundamentals": f"{company} 2025年 财报 营收 净利润 主营业务",
+        "news": f"{company} 最新 新闻 动态 公告 2025 2026",
+        "risks": f"{company} 风险 亏损 诉讼 争议 负面",
     }
 
     results: dict[str, list[SearchResult]] = {}
