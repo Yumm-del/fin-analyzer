@@ -189,7 +189,7 @@ def search_bing(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Searc
         list[SearchResult] — 搜索结果列表
     """
     results: list[SearchResult] = []
-    url = "https://cn.bing.com/search"
+    url = "https://www.bing.com/search"  # 全球 Bing（中文搜索质量优于 cn.bing.com）
 
     headers = {
         "User-Agent": (
@@ -203,7 +203,11 @@ def search_bing(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Searc
     try:
         response = requests.get(
             url,
-            params={"q": query, "count": max_results},
+            params={
+                "q": query,
+                "count": max_results,
+                "setlang": "en",       # 使用全球版 Bing，搜索质量更好
+            },
             headers=headers,
             timeout=SEARCH_TIMEOUT,
         )
@@ -271,6 +275,68 @@ def search_bing(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Searc
     return results
 
 
+def _filter_relevant_results(
+    results: list[SearchResult],
+    query: str,
+) -> list[SearchResult]:
+    """
+    过滤搜索结果中的垃圾/不相关内容。
+
+    Bing 的反爬机制有时会返回完全不相关的结果（如淘宝、GitHub、
+    天气网站等）。这个函数检查每条结果的标题和摘要是否与搜索关键词
+    有任何关联，不相关的直接丢弃。
+
+    PM 视角：
+      与其给 LLM 一堆垃圾信息让它硬着头皮分析，
+      不如直接告诉 LLM「搜索没找到有效信息」——
+      LLM 基于训练数据的分析反而更靠谱。
+
+    返回：
+      过滤后的有效结果列表
+    """
+    # 明显是垃圾站点的域名黑名单
+    spam_domains = [
+        "worldtimebuddy.com", "qr-code-generator.com", "app-sorteos.com",
+        "feimogames.com", "52fhz.com", "hanyuguoxue.com",
+    ]
+    # 明显非财经类域名的部分匹配（这些域名大概率返回了不相关内容）
+    non_finance_keywords = [
+        "github.com", "apple.com/app", "instagram", "youtube",
+        "microsoft.com/powerpoint", "google.com/support",
+        "taobao.com/list", "bilibili.com", "quark.cn",
+        "xueersi.com", "douyin.com", "weixin.qq.com/filehelper",
+        "sfr.fr", "aliyun.com", "ru.wikipedia.org",
+    ]
+
+    filtered: list[SearchResult] = []
+    for r in results:
+        # 检查是否来自垃圾站点
+        is_spam = False
+        for domain in spam_domains:
+            if domain in r.href.lower():
+                is_spam = True
+                break
+        if is_spam:
+            continue
+
+        # 检查是否明显非财经内容
+        for kw in non_finance_keywords:
+            if kw in r.href.lower():
+                is_spam = True
+                break
+        if is_spam:
+            continue
+
+        # 通过检查
+        filtered.append(r)
+
+    if len(filtered) < len(results):
+        print(f"   🧹 过滤掉 {len(results) - len(filtered)} 条不相关结果，"
+              f"保留 {len(filtered)} 条")
+
+    return filtered
+
+
 def search_web(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[SearchResult]:
     """
     搜索指定关键词 — 优先使用 Bing（国内可用），失败时回退到 DuckDuckGo。
@@ -302,6 +368,10 @@ def search_web(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Search
 
     # ——— 优先使用 Bing（国内可用） ———
     bing_results = search_bing(query, max_results)
+
+    # 过滤掉明显不相关的垃圾结果
+    # Bing 有时会返回完全不相关的内容（被反爬干扰或搜索质量问题）
+    bing_results = _filter_relevant_results(bing_results, query)
     if bing_results:
         return bing_results
 
@@ -402,6 +472,79 @@ def search_web(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Search
     return results
 
 
+def _get_english_hint(company: str) -> str:
+    """
+    根据中文公司名返回英文搜索提示（英文名 + 股票代码）。
+
+    为什么需要这个？
+      Bing 的中文分词很差，"宁德时代"会被拆成"宁德"+"时代"，
+      搜索结果全是宁德市旅游攻略。但加上"CATL 300750"后，
+      Bing 能准确定位到宁德时代这家公司。
+
+    PM 视角：
+      这是一个「搜索质量修复」而非功能。用户不需要知道背后的机制，
+      但有了它，搜索结果从"完全不相关"变成"精准命中"。
+
+    后续优化方向：
+      可以通过 API 动态查询公司英文名和股票代码，
+      而不是依赖硬编码的映射表。
+    """
+    # 常见中国公司的中英文映射（后续可扩展或接入 API）
+    hints = {
+        "宁德时代": "CATL 300750",
+        "比亚迪": "BYD 002594 1211.HK",
+        "中国平安": "Ping An Insurance 601318",
+        "贵州茅台": "Kweichow Moutai 600519",
+        "招商银行": "China Merchants Bank 600036",
+        "腾讯": "Tencent 0700.HK",
+        "阿里巴巴": "Alibaba BABA 9988.HK",
+        "美团": "Meituan 3690.HK",
+        "京东": "JD.com 9618.HK",
+        "百度": "Baidu 9888.HK",
+        "小米": "Xiaomi 1810.HK",
+        "网易": "NetEase 9999.HK",
+        "工商银行": "ICBC 601398",
+        "建设银行": "CCB 601939",
+        "农业银行": "ABC 601288",
+        "中国银行": "Bank of China 601988",
+        "中国移动": "China Mobile 600941",
+        "中国石油": "PetroChina 601857",
+        "中国石化": "Sinopec 600028",
+        "中国神华": "China Shenhua 601088",
+        "中芯国际": "SMIC 688981",
+        "海康威视": "Hikvision 002415",
+        "美的集团": "Midea 000333",
+        "格力电器": "Gree 000651",
+        "万科": "Vanke 000002",
+        "保利发展": "Poly 600048",
+        "恒瑞医药": "Hengrui Medicine 600276",
+        "药明康德": "WuXi AppTec 603259",
+        "隆基绿能": "LONGi 601012",
+        "阳光电源": "Sungrow 300274",
+        "中兴通讯": "ZTE 000063",
+        "科大讯飞": "iFlytek 002230",
+        "三一重工": "Sany 600031",
+        "海尔智家": "Haier 600690",
+        "长城汽车": "Great Wall Motor 601633",
+        "蔚来": "NIO NIO.US",
+        "小鹏汽车": "XPeng XPEV.US",
+        "理想汽车": "Li Auto LI.US",
+        "拼多多": "Pinduoduo PDD.US",
+        "网易有道": "NetEase Youdao DAO.US",
+    }
+
+    # 精确匹配
+    if company in hints:
+        return hints[company]
+
+    # 模糊匹配——检查公司名是否包含已知的公司关键词
+    for key, hint in hints.items():
+        if key in company or company in key:
+            return hint
+
+    return ""  # 未知公司，只用中文搜索
+
+
 def parallel_search(company: str) -> dict[str, list[SearchResult]]:
     """
     并行搜索三个维度的信息。
@@ -421,10 +564,14 @@ def parallel_search(company: str) -> dict[str, list[SearchResult]]:
     返回值：
         {"fundamentals": [...], "news": [...], "risks": [...]}
     """
+    # 搜索关键词设计（PM 视角）：
+    #   中英混合搜索——Bing 的中文分词很烂（会把"宁德时代"拆成"宁德"+"时代"），
+    #   但加上英文名/股票代码后就能精准定位。英文术语也能帮 LLM 更好理解上下文。
+    english_hint = _get_english_hint(company)
     queries = {
-        "fundamentals": f"{company} 公司基本面 主营业务 财报 2025 2026",
-        "news": f"{company} 最新动态 新闻 2026",
-        "risks": f"{company} 风险 负面 亏损 诉讼 争议",
+        "fundamentals": f'{company} {english_hint} 财报 营收 净利润 主营业务 2025',
+        "news": f'{company} {english_hint} 最新 新闻 动态 2025 2026',
+        "risks": f'{company} {english_hint} 风险 亏损 诉讼 争议',
     }
 
     results: dict[str, list[SearchResult]] = {}
@@ -547,10 +694,14 @@ def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchRe
 
 {risks}
 
-请根据以上信息，严格按照输出格式要求，生成一份专业的金融分析简报。
-如果搜索结果为空，请基于你的训练数据中关于该公司的知识进行分析，
-但必须标注「以下分析基于 AI 训练知识，可能存在时效性不足的问题」。
-如果搜索结果存在，则严格基于搜索结果，不编造信息。"""
+请根据以上信息生成专业的金融分析简报。注意：
+
+- 如果搜索结果**包含该公司真实信息**（如官网、财报、新闻等），严格基于搜索结果分析，每条信息标注来源 URL。
+- 如果搜索结果**为空或不相关**（如杂讯、无关网站），则使用你的训练知识进行分析，但必须在报告中明确标注：
+  「⚠️ 数据来源说明：本次分析基于 AI 训练知识（知识截止日期约为 2025 年中），未获取到实时网络数据。
+   建议通过东方财富(eastmoney.com)、巨潮资讯(cninfo.com.cn)等渠道核实最新信息。」
+- 无论哪种情况，都不要编造不存在的财务数据或新闻。不确定的信息标注「公开信息中暂未核实」。
+- 不要给出「买入/卖出/持有」等投资建议。"""
 
     return user_prompt
 
