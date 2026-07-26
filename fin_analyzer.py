@@ -64,7 +64,7 @@ except ImportError:
 
 # DeepSeek API 配置
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEEPSEEK_MODEL = "deepseek-chat"  # V3 模型，性价比最高
+DEEPSEEK_MODEL = "deepseek-v4-pro"  # DeepSeek V4 Pro，推理能力强，适合金融分析
 
 # 搜索配置
 SEARCH_MAX_RESULTS = 5  # 每个维度返回的搜索结果数

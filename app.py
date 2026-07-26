@@ -451,6 +451,19 @@ def execute_analysis(company: str, fast_mode: bool = True):
 
         # ——— Step 2: LLM 分析 ———
         st.write("🤖 **AI 分析中** ——— 调用 DeepSeek 生成结构化报告……")
+
+        # 调试：确认 API Key 已正确传递
+        current_key = fa.DEEPSEEK_API_KEY
+        if not current_key:
+            status.update(label="未配置 API Key ❌", state="error")
+            st.error(
+                "**未检测到 API Key。**\n\n"
+                "请确认已在左侧边栏「🔑 API 配置」中输入 DeepSeek API Key。\n"
+                "如果已输入但仍然报错，请刷新页面后重新输入。"
+            )
+            return
+
+        st.write(f"   🔑 使用 Key: {current_key[:10]}...（已脱敏）")
         report = fa.analyze_company(company, search_results)
 
         if report is None:
@@ -459,8 +472,9 @@ def execute_analysis(company: str, fast_mode: bool = True):
                 "LLM 分析失败。可能的原因：\n\n"
                 "1. **API Key 无效或已过期** → 检查 [DeepSeek 控制台](https://platform.deepseek.com)\n"
                 "2. **API 额度用完了** → 新用户有免费额度，检查余额\n"
-                "3. **网络连接问题** → DeepSeek API 可能需要稳定的网络\n\n"
-                "请检查后重试。"
+                "3. **网络连接问题** → DeepSeek API 可能连接不稳定\n"
+                "4. **Key 格式错误** → 确保是完整的 `sk-` 开头字符串，没有多余空格\n\n"
+                "请检查后刷新页面重试。"
             )
             return
 
