@@ -24,9 +24,26 @@ Fin Analyzer — AI 金融分析 Web 界面
 import streamlit as st
 import sys
 import os
+import io
 import json
 import time
 from datetime import datetime
+
+# ——— 修复 Windows GBK 编码问题 ———
+# fin_analyzer.py 的 print 语句中使用了 emoji（✅❌⚠️等），
+# 在 Windows 中文系统上，Streamlit 捕获 stdout 时会因为 GBK 编码
+# 无法处理 emoji 而崩溃。这里把 stdout/stderr 强制设为 UTF-8。
+# 不影响 CLI 版（CLI 版直接用终端，不受此限制）。
+if sys.stdout.encoding and sys.stdout.encoding.lower() in ('gbk', 'gb2312', 'gb18030', 'cp936'):
+    try:
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer, encoding='utf-8', errors='replace'
+        )
+        sys.stderr = io.TextIOWrapper(
+            sys.stderr.buffer, encoding='utf-8', errors='replace'
+        )
+    except Exception:
+        pass  # 如果 stdout 已经被包装过，忽略
 
 # ——— 路径配置：确保能导入同目录下的 fin_analyzer 模块 ———
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
