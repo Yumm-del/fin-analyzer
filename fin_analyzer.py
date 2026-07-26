@@ -472,6 +472,185 @@ def search_web(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Search
     return results
 
 
+# ——— 东方财富数据接口 ———
+# 行情 API 是公开接口，无需 API Key，国内可用且返回实时金融数据
+EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
+EASTMONEY_SEARCH_URL = "https://searchadapter.eastmoney.com/api/suggest/get"
+
+
+def _lookup_stock_code(company: str) -> dict | None:
+    """
+    通过东方财富搜索接口查找公司股票代码和基本信息。
+
+    参数：
+        company: 公司名称（如"宁德时代"）
+
+    返回值：
+        {"code": "300750", "name": "宁德时代", "market": "0", "type": "AStock"}
+        找不到返回 None
+    """
+    try:
+        import urllib.parse as ul_parse
+        import urllib.request as ul_req
+
+        params = ul_parse.urlencode({
+            "input": company,
+            "type": "14",
+            "token": "D43BF722C8E33BDC906FB84D85E326E8",
+            "count": "3",
+        })
+        url = f"{EASTMONEY_SEARCH_URL}?{params}"
+
+        req = ul_req.Request(url, headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "*/*",
+        })
+        with ul_req.urlopen(req, timeout=5) as resp:
+            import json
+            data = json.loads(resp.read().decode("utf-8"))
+
+        items = (data.get("QuotationCodeTable", {}).get("Data", [])
+                 if isinstance(data, dict) else [])
+
+        for item in items:
+            # 优先选 A 股（MarketType=2）
+            name = item.get("Name", "")
+            code = item.get("Code", "")
+            market = item.get("MktNum", "0")
+            stype = item.get("SecurityTypeName", "")
+
+            if code and name:
+                return {
+                    "code": code,
+                    "name": name,
+                    "market": market,
+                    "type": stype,
+                    "secid": f"{market}.{code}",
+                }
+
+    except Exception as e:
+        print(f"   ⚠️  股票代码查询失败: {e}")
+
+    return None
+
+
+def _get_financial_data(secid: str) -> dict:
+    """
+    通过东方财富行情 API 获取公司实时财务数据。
+
+    参数：
+        secid: 证券 ID，格式如 "0.300750"（market.code）
+
+    返回值：
+        dict，包含市值、PE、营收、净利润等核心财务指标。
+        字段说明：
+        - total_mcap: 总市值（元）
+        - pe_dynamic: 动态市盈率
+        - revenue: 营业总收入（元）
+        - net_profit: 净利润（元）
+        - roe: 净资产收益率(%)
+        - revenue_growth: 营收同比增速(%)
+        - net_profit_growth: 净利润同比增速(%)
+        - gross_margin: 销售毛利率(%)
+        - industry: 所属行业
+        - total_shares: 总股本
+    """
+    fields = (
+        "f57,f58,f84,f85,f100,f116,f117,"
+        "f162,f164,f167,f169,f170,f171,f173,f175,f177,f183,"
+        "f9,f12,f20,f21,f40,f41,f45"
+    )
+    field_map = {
+        "f57": "code",
+        "f58": "name",
+        "f84": "total_shares",       # 总股本
+        "f85": "circulating_shares", # 流通股本
+        "f100": "industry",          # 行业
+        "f116": "total_mcap",        # 总市值
+        "f117": "circulating_mcap",  # 流通市值
+        "f162": "pe_static",         # 静态市盈率
+        "f164": "pe_dynamic",        # 动态市盈率
+        "f167": "revenue",           # 营业总收入
+        "f169": "net_profit",        # 净利润
+        "f170": "net_profit_growth", # 净利润同比增速
+        "f171": "nav_per_share",     # 每股净资产
+        "f173": "roe",               # ROE
+        "f175": "revenue_growth",    # 营收同比增速
+        "f177": "gross_margin",      # 销售毛利率
+        "f183": "dividend_yield",    # 股息率
+    }
+
+    try:
+        import urllib.parse as ul_parse
+        import urllib.request as ul_req
+        import json as json_mod
+
+        params = ul_parse.urlencode({"secid": secid, "fields": fields})
+        url = f"{EASTMONEY_QUOTE_URL}?{params}"
+        req = ul_req.Request(url, headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "*/*",
+        })
+        with ul_req.urlopen(req, timeout=5) as resp:
+            raw_data = json_mod.loads(resp.read().decode("utf-8"))
+        data = raw_data.get("data", {})
+        if not data:
+            return {}
+
+        result = {}
+        for field_key, field_name in field_map.items():
+            val = data.get(field_key, "")
+            if val and val != "-" and val is not None:
+                try:
+                    val = float(val)
+                except (ValueError, TypeError):
+                    pass
+                result[field_name] = val
+
+        return result
+
+    except Exception as e:
+        print(f"   ⚠️  财务数据获取失败: {e}")
+        return {}
+
+
+def _format_financial_data(data: dict) -> str:
+    """
+    将财务数据格式化为 LLM prompt 中的结构化文本。
+
+    对极大/极小值做人性化转换（元→亿元），方便 LLM 理解。
+    """
+    if not data:
+        return "（未获取到实时财务数据）"
+
+    def yuan_to_yi(val):
+        """元转亿元，保留 2 位小数"""
+        if val and isinstance(val, (int, float)) and abs(val) > 10000:
+            return f"{val / 100_000_000:.2f} 亿元"
+        return str(val) if val else "—"
+
+    lines = ["| 指标 | 数值 |", "|------|------|"]
+    rows = [
+        ("公司名称", data.get("name", "—")),
+        ("所属行业", data.get("industry", "—")),
+        ("总市值", yuan_to_yi(data.get("total_mcap"))),
+        ("市盈率(动)", f"{data['pe_dynamic']:.2f}" if data.get("pe_dynamic") else "—"),
+        ("市盈率(静)", f"{data['pe_static']:.2f}" if data.get("pe_static") else "—"),
+        ("营业总收入", yuan_to_yi(data.get("revenue"))),
+        ("净利润", yuan_to_yi(data.get("net_profit"))),
+        ("营收增速", f"{data['revenue_growth']:.2f}%" if data.get("revenue_growth") else "—"),
+        ("净利润增速", f"{data['net_profit_growth']:.2f}%" if data.get("net_profit_growth") else "—"),
+        ("ROE", f"{data['roe']:.2f}%" if data.get("roe") else "—"),
+        ("毛利率", f"{data['gross_margin']:.2f}%" if data.get("gross_margin") else "—"),
+        ("每股净资产", f"{data['nav_per_share']:.2f}" if data.get("nav_per_share") else "—"),
+        ("股息率", f"{data['dividend_yield']:.2f}%" if data.get("dividend_yield") else "—"),
+    ]
+    for label, value in rows:
+        lines.append(f"| {label} | {value} |")
+
+    return "\n".join(lines)
+
+
 def _get_english_hint(company: str) -> str:
     """
     根据中文公司名返回英文搜索提示（英文名 + 股票代码）。
@@ -659,7 +838,12 @@ SYSTEM_PROMPT = """# Role（角色）
 
 def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchResult]]) -> str:
     """
-    把搜索结果拼装成给 LLM 的 prompt。
+    把搜索结果 + 实时财务数据拼装成给 LLM 的 prompt。
+
+    数据来源优先级：
+      1. 东方财富实时行情 ———— 市值、PE、营收、ROE 等硬指标
+      2. Bing 网络搜索 ———— 新闻、动态、研报等软信息
+      3. LLM 训练知识 ———— 作为补充（明确标注）
 
     参数：
         company: 公司名称
@@ -668,6 +852,14 @@ def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchRe
     返回值：
         拼接好的 prompt 字符串
     """
+    # ——— 获取实时财务数据 ———
+    stock_info = _lookup_stock_code(company)
+    financial_text = ""
+    if stock_info:
+        fin_data = _get_financial_data(stock_info["secid"])
+        financial_text = _format_financial_data(fin_data)
+        print(f"   📊 获取到 {stock_info['name']}({stock_info['code']}) 实时行情数据")
+
     # 把搜索结果格式化为文本
     def format_results(results: list[SearchResult], label: str) -> str:
         if not results:
@@ -686,7 +878,11 @@ def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchRe
 
     user_prompt = f"""请分析以下公司：**{company}**
 
-以下是网络搜索获取的信息：
+## 实时行情数据（来源：东方财富，数据实时更新）
+
+{financial_text if financial_text else "（未获取到实时行情数据）"}
+
+## 网络搜索信息
 
 {fundamentals}
 
@@ -695,11 +891,9 @@ def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchRe
 {risks}
 
 请根据以上信息生成专业的金融分析简报。注意：
-
-- 如果搜索结果**包含该公司真实信息**（如官网、财报、新闻等），严格基于搜索结果分析，每条信息标注来源 URL。
-- 如果搜索结果**为空或不相关**（如杂讯、无关网站），则使用你的训练知识进行分析，但必须在报告中明确标注：
-  「⚠️ 数据来源说明：本次分析基于 AI 训练知识（知识截止日期约为 2025 年中），未获取到实时网络数据。
-   建议通过东方财富(eastmoney.com)、巨潮资讯(cninfo.com.cn)等渠道核实最新信息。」
+- **优先使用实时行情数据中的财务指标**（市值、PE、营收、ROE 等），这些是准确数据。
+- 网络搜索结果可用于补充新闻动态和风险信息。
+- 如果网络搜索信息不充分，用你的训练知识补充公司背景和行业分析。
 - 无论哪种情况，都不要编造不存在的财务数据或新闻。不确定的信息标注「公开信息中暂未核实」。
 - 不要给出「买入/卖出/持有」等投资建议。"""
 
