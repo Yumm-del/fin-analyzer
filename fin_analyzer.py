@@ -26,11 +26,28 @@ AI 金融分析 Agent v0.1 ———— 基础版（单次搜索 + LLM 分析）
 
 import os
 import sys
+import io
 import json
 import time
 from datetime import datetime
 from dataclasses import dataclass, asdict, field
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ——— 修复 Windows GBK 编码问题 ———
+# Python 在 Windows 中文系统上默认用 GBK 编码 stdout，
+# 导致 emoji（✅⚠️❌等）输出时报 UnicodeEncodeError。
+# 这里在模块加载时把 stdout/stderr 强制设为 UTF-8（兼容 CLI 和 Web）。
+if hasattr(sys.stdout, 'buffer') and sys.stdout.encoding:
+    if sys.stdout.encoding.lower() in ('gbk', 'gb2312', 'gb18030', 'cp936'):
+        try:
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer, encoding='utf-8', errors='replace'
+            )
+            sys.stderr = io.TextIOWrapper(
+                sys.stderr.buffer, encoding='utf-8', errors='replace'
+            )
+        except Exception:
+            pass
 
 # ——— 搜索相关 ———
 # 用 requests 直接访问 DuckDuckGo HTML 页面，不依赖第三方搜索库
@@ -64,11 +81,11 @@ except ImportError:
 
 # DeepSeek API 配置
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEEPSEEK_MODEL = "deepseek-chat"  # V3 模型，性价比最高
+DEEPSEEK_MODEL = "deepseek-v4-pro"  # DeepSeek V4 Pro，推理能力强，适合金融分析
 
 # 搜索配置
 SEARCH_MAX_RESULTS = 5  # 每个维度返回的搜索结果数
-SEARCH_TIMEOUT = 10     # 每次搜索超时秒数
+SEARCH_TIMEOUT = 5      # 每次搜索超时秒数（国内网络环境缩短等待时间）
 
 # 报告保存路径（和 tarot-cli 的 JOURNAL_PATH 一样的设计）
 REPORT_DIR = os.path.join(os.path.dirname(__file__), "reports")
@@ -151,9 +168,184 @@ class AnalysisReport:
 #   · 对于公司基本面/新闻这类公开信息，DuckDuckGo 完全够用
 
 
+def search_bing(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[SearchResult]:
+    """
+    在 Bing（必应）上搜索指定关键词。
+
+    为什么加 Bing？
+      DuckDuckGo 在国内经常被墙，但 cn.bing.com 在国内可以正常访问。
+      Bing 是微软的搜索引擎，对中文搜索支持很好，
+      而且搜索结果时效性高（会标注"1天前""3小时前"等）。
+
+    原理：
+      直接 HTTP GET 请求 cn.bing.com，解析 HTML 提取搜索结果。
+      和 DuckDuckGo 搜索器一样，用正则解析，零额外依赖。
+
+    参数：
+        query: 搜索关键词（支持中文）
+        max_results: 最多返回几条结果
+
+    返回值：
+        list[SearchResult] — 搜索结果列表
+    """
+    results: list[SearchResult] = []
+    url = "https://cn.bing.com/search"  # 国内 Bing，中文搜索质量最好
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "zh-CN,zh;q=0.9",
+    }
+
+    try:
+        response = requests.get(
+            url,
+            params={"q": query, "count": max_results},
+            headers=headers,
+            timeout=SEARCH_TIMEOUT,
+        )
+
+        if response.status_code != 200:
+            print(f"   ⚠️  Bing 返回 {response.status_code}，回退到 DuckDuckGo")
+            return results
+
+        html = response.text
+
+        # Bing 的搜索结果在 <li class="b_algo"> 里
+        # 每个 b_algo 包含：<a href="...">标题</a> 和 <p>摘要</p>
+        algo_pattern = re.compile(
+            r'<li class="b_algo"[^>]*>(.*?)</li>',
+            re.DOTALL,
+        )
+        blocks = algo_pattern.findall(html)
+
+        for block in blocks:
+            if len(results) >= max_results:
+                break
+
+            # 提取链接和标题
+            link_match = re.search(
+                r'<a[^>]*href="(https?://[^"]*)"[^>]*>(.*?)</a>',
+                block, re.DOTALL,
+            )
+            if not link_match:
+                continue
+
+            href = link_match.group(1)
+            # 标题中可能有 HTML 标签，去掉
+            title = re.sub(r'<[^>]+>', '', link_match.group(2)).strip()
+
+            # 跳过非 http 链接和 Bing 自身的链接
+            if not href.startswith("http") or "bing.com" in href:
+                continue
+
+            # 提取摘要（<p> 标签中的文字）
+            snippet_match = re.search(r'<p[^>]*>(.*?)</p>', block, re.DOTALL)
+            snippet = ""
+            if snippet_match:
+                # 去掉 HTML 实体和标签
+                raw = snippet_match.group(1)
+                raw = raw.replace("&ensp;", " ").replace("&#0183;", "·")
+                snippet = re.sub(r'<[^>]+>', '', raw).strip()
+
+            if title and href:
+                results.append(SearchResult(
+                    title=title,
+                    href=href,
+                    body=snippet,
+                ))
+
+        if results:
+            print(f"   ✅ Bing 搜索完成: {query[:40]}... ({len(results)} 条结果)")
+
+    except requests.exceptions.Timeout:
+        print(f"   ⏱️  Bing 搜索超时，回退到 DuckDuckGo")
+    except requests.exceptions.ConnectionError:
+        print(f"   🔌 Bing 连接失败，回退到 DuckDuckGo")
+    except Exception as e:
+        print(f"   ⚠️  Bing 搜索异常: {e}")
+
+    return results
+
+
+def _filter_relevant_results(
+    results: list[SearchResult],
+    query: str,
+) -> list[SearchResult]:
+    """
+    过滤搜索结果中的垃圾/不相关内容。
+
+    Bing 的反爬机制有时会返回完全不相关的结果（如淘宝、GitHub、
+    天气网站等）。这个函数检查每条结果的标题和摘要是否与搜索关键词
+    有任何关联，不相关的直接丢弃。
+
+    PM 视角：
+      与其给 LLM 一堆垃圾信息让它硬着头皮分析，
+      不如直接告诉 LLM「搜索没找到有效信息」——
+      LLM 基于训练数据的分析反而更靠谱。
+
+    返回：
+      过滤后的有效结果列表
+    """
+    # 明显是垃圾站点的域名（Bing 反爬/质量差时返回的无关内容）
+    spam_domains = [
+        "worldtimebuddy.com", "qr-code-generator.com", "app-sorteos.com",
+        "feimogames.com", "52fhz.com", "hanyuguoxue.com",
+    ]
+    # 明显非财经/非公司官网类内容的域名片段
+    non_finance_keywords = [
+        "github.com", "apple.com/app", "instagram", "youtube",
+        "microsoft.com/powerpoint", "google.com/support",
+        "taobao.com/list", "bilibili.com", "quark.cn",
+        "xueersi.com", "douyin.com", "weixin.qq.com/filehelper",
+        "sfr.fr", "aliyun.com", "ru.wikipedia.org",
+        # Bing 经常返回的无关中文内容
+        "zhidao.baidu.com",       # 百度知道（Q&A，非财经）
+        "zhuanlan.zhihu.com",     # 知乎专栏（常为旅游、百科等）
+        "ningde.gov.cn",           # 宁德市政府（不是宁德时代！）
+        "baike.baidu.com/item",   # 百度百科（非财经新闻）
+    ]
+
+    filtered: list[SearchResult] = []
+    for r in results:
+        # 检查是否来自垃圾站点
+        is_spam = False
+        for domain in spam_domains:
+            if domain in r.href.lower():
+                is_spam = True
+                break
+        if is_spam:
+            continue
+
+        # 检查是否明显非财经内容
+        for kw in non_finance_keywords:
+            if kw in r.href.lower():
+                is_spam = True
+                break
+        if is_spam:
+            continue
+
+        # 通过检查
+        filtered.append(r)
+
+    if len(filtered) < len(results):
+        print(f"   🧹 过滤掉 {len(results) - len(filtered)} 条不相关结果，"
+              f"保留 {len(filtered)} 条")
+
+    return filtered
+
+
 def search_web(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[SearchResult]:
     """
-    在 DuckDuckGo 上搜索指定关键词。
+    搜索指定关键词 — 优先使用 Bing（国内可用），失败时回退到 DuckDuckGo。
+
+    搜索策略（PM 视角）：
+      1. 先试 Bing ———— 国内网络可用，时效性高
+      2. Bing 失败 → DuckDuckGo ———— 作为备用
+      3. 都失败 → 返回空列表 ———— LLM 用训练数据分析（优雅降级）
 
     参数：
         query: 搜索关键词（支持中文）
@@ -173,6 +365,18 @@ def search_web(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Search
         · 直接用 HTTP 请求 DuckDuckGo HTML 页面，稳定性好很多
         · 加了 3 个备用域名，一个挂了自动切下一个
     """
+    results: list[SearchResult] = []
+
+    # ——— 优先使用 Bing（国内可用） ———
+    bing_results = search_bing(query, max_results)
+
+    # 过滤掉明显不相关的垃圾结果
+    # Bing 有时会返回完全不相关的内容（被反爬干扰或搜索质量问题）
+    bing_results = _filter_relevant_results(bing_results, query)
+    if bing_results:
+        return bing_results
+
+    # ——— Bing 失败，回退到 DuckDuckGo ———
     results: list[SearchResult] = []
 
     # DuckDuckGo 的 HTML 端点（不需要 JS 渲染）
@@ -269,6 +473,258 @@ def search_web(query: str, max_results: int = SEARCH_MAX_RESULTS) -> list[Search
     return results
 
 
+# ——— 东方财富数据接口 ———
+# 行情 API 是公开接口，无需 API Key，国内可用且返回实时金融数据
+EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
+EASTMONEY_SEARCH_URL = "https://searchadapter.eastmoney.com/api/suggest/get"
+
+
+def _lookup_stock_code(company: str) -> dict | None:
+    """
+    通过东方财富搜索接口查找公司股票代码和基本信息。
+
+    参数：
+        company: 公司名称（如"宁德时代"）
+
+    返回值：
+        {"code": "300750", "name": "宁德时代", "market": "0", "type": "AStock"}
+        找不到返回 None
+    """
+    try:
+        import urllib.parse as ul_parse
+        import urllib.request as ul_req
+
+        params = ul_parse.urlencode({
+            "input": company,
+            "type": "14",
+            "token": "D43BF722C8E33BDC906FB84D85E326E8",
+            "count": "3",
+        })
+        url = f"{EASTMONEY_SEARCH_URL}?{params}"
+
+        req = ul_req.Request(url, headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "*/*",
+        })
+        with ul_req.urlopen(req, timeout=5) as resp:
+            import json
+            data = json.loads(resp.read().decode("utf-8"))
+
+        items = (data.get("QuotationCodeTable", {}).get("Data", [])
+                 if isinstance(data, dict) else [])
+
+        for item in items:
+            # 优先选 A 股（MarketType=2）
+            name = item.get("Name", "")
+            code = item.get("Code", "")
+            market = item.get("MktNum", "0")
+            stype = item.get("SecurityTypeName", "")
+
+            if code and name:
+                return {
+                    "code": code,
+                    "name": name,
+                    "market": market,
+                    "type": stype,
+                    "secid": f"{market}.{code}",
+                }
+
+    except Exception as e:
+        print(f"   ⚠️  股票代码查询失败: {e}")
+
+    return None
+
+
+def _get_financial_data(secid: str) -> dict:
+    """
+    通过东方财富行情 API 获取公司实时财务数据。
+
+    参数：
+        secid: 证券 ID，格式如 "0.300750"（market.code）
+
+    返回值：
+        dict，包含市值、PE、营收、净利润等核心财务指标。
+        字段说明：
+        - total_mcap: 总市值（元）
+        - pe_dynamic: 动态市盈率
+        - revenue: 营业总收入（元）
+        - net_profit: 净利润（元）
+        - roe: 净资产收益率(%)
+        - revenue_growth: 营收同比增速(%)
+        - net_profit_growth: 净利润同比增速(%)
+        - gross_margin: 销售毛利率(%)
+        - industry: 所属行业
+        - total_shares: 总股本
+    """
+    fields = (
+        "f57,f58,f84,f85,f100,f116,f117,"
+        "f162,f164,f167,f169,f170,f171,f173,f175,f177,f183,"
+        "f9,f12,f20,f21,f40,f41,f45"
+    )
+    field_map = {
+        "f57": "code",
+        "f58": "name",
+        "f84": "total_shares",       # 总股本
+        "f85": "circulating_shares", # 流通股本
+        "f100": "industry",          # 行业
+        "f116": "total_mcap",        # 总市值
+        "f117": "circulating_mcap",  # 流通市值
+        "f162": "pe_static",         # 静态市盈率
+        "f164": "pe_dynamic",        # 动态市盈率
+        "f167": "revenue",           # 营业总收入
+        "f169": "net_profit",        # 净利润
+        "f170": "net_profit_growth", # 净利润同比增速
+        "f171": "nav_per_share",     # 每股净资产
+        "f173": "roe",               # ROE
+        "f175": "revenue_growth",    # 营收同比增速
+        "f177": "gross_margin",      # 销售毛利率
+        "f183": "dividend_yield",    # 股息率
+    }
+
+    try:
+        import urllib.parse as ul_parse
+        import urllib.request as ul_req
+        import json as json_mod
+
+        params = ul_parse.urlencode({"secid": secid, "fields": fields})
+        url = f"{EASTMONEY_QUOTE_URL}?{params}"
+        req = ul_req.Request(url, headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "*/*",
+        })
+        with ul_req.urlopen(req, timeout=5) as resp:
+            raw_data = json_mod.loads(resp.read().decode("utf-8"))
+        data = raw_data.get("data", {})
+        if not data:
+            return {}
+
+        result = {}
+        for field_key, field_name in field_map.items():
+            val = data.get(field_key, "")
+            if val and val != "-" and val is not None:
+                try:
+                    val = float(val)
+                except (ValueError, TypeError):
+                    pass
+                result[field_name] = val
+
+        return result
+
+    except Exception as e:
+        print(f"   ⚠️  财务数据获取失败: {e}")
+        return {}
+
+
+def _format_financial_data(data: dict) -> str:
+    """
+    将财务数据格式化为 LLM prompt 中的结构化文本。
+
+    对极大/极小值做人性化转换（元→亿元），方便 LLM 理解。
+    """
+    if not data:
+        return "（未获取到实时财务数据）"
+
+    def yuan_to_yi(val):
+        """元转亿元，保留 2 位小数"""
+        if val and isinstance(val, (int, float)) and abs(val) > 10000:
+            return f"{val / 100_000_000:.2f} 亿元"
+        return str(val) if val else "—"
+
+    lines = ["| 指标 | 数值 |", "|------|------|"]
+    rows = [
+        ("公司名称", data.get("name", "—")),
+        ("所属行业", data.get("industry", "—")),
+        ("总市值", yuan_to_yi(data.get("total_mcap"))),
+        ("市盈率(动)", f"{data['pe_dynamic']:.2f}" if data.get("pe_dynamic") else "—"),
+        ("市盈率(静)", f"{data['pe_static']:.2f}" if data.get("pe_static") else "—"),
+        ("营业总收入", yuan_to_yi(data.get("revenue"))),
+        ("净利润", yuan_to_yi(data.get("net_profit"))),
+        ("营收增速", f"{data['revenue_growth']:.2f}%" if data.get("revenue_growth") else "—"),
+        ("净利润增速", f"{data['net_profit_growth']:.2f}%" if data.get("net_profit_growth") else "—"),
+        ("ROE", f"{data['roe']:.2f}%" if data.get("roe") else "—"),
+        ("毛利率", f"{data['gross_margin']:.2f}%" if data.get("gross_margin") else "—"),
+        ("每股净资产", f"{data['nav_per_share']:.2f}" if data.get("nav_per_share") else "—"),
+        ("股息率", f"{data['dividend_yield']:.2f}%" if data.get("dividend_yield") else "—"),
+    ]
+    for label, value in rows:
+        lines.append(f"| {label} | {value} |")
+
+    return "\n".join(lines)
+
+
+def _get_english_hint(company: str) -> str:
+    """
+    根据中文公司名返回英文搜索提示（英文名 + 股票代码）。
+
+    为什么需要这个？
+      Bing 的中文分词很差，"宁德时代"会被拆成"宁德"+"时代"，
+      搜索结果全是宁德市旅游攻略。但加上"CATL 300750"后，
+      Bing 能准确定位到宁德时代这家公司。
+
+    PM 视角：
+      这是一个「搜索质量修复」而非功能。用户不需要知道背后的机制，
+      但有了它，搜索结果从"完全不相关"变成"精准命中"。
+
+    后续优化方向：
+      可以通过 API 动态查询公司英文名和股票代码，
+      而不是依赖硬编码的映射表。
+    """
+    # 常见中国公司的中英文映射（后续可扩展或接入 API）
+    hints = {
+        "宁德时代": "CATL 300750",
+        "比亚迪": "BYD 002594 1211.HK",
+        "中国平安": "Ping An Insurance 601318",
+        "贵州茅台": "Kweichow Moutai 600519",
+        "招商银行": "China Merchants Bank 600036",
+        "腾讯": "Tencent 0700.HK",
+        "阿里巴巴": "Alibaba BABA 9988.HK",
+        "美团": "Meituan 3690.HK",
+        "京东": "JD.com 9618.HK",
+        "百度": "Baidu 9888.HK",
+        "小米": "Xiaomi 1810.HK",
+        "网易": "NetEase 9999.HK",
+        "工商银行": "ICBC 601398",
+        "建设银行": "CCB 601939",
+        "农业银行": "ABC 601288",
+        "中国银行": "Bank of China 601988",
+        "中国移动": "China Mobile 600941",
+        "中国石油": "PetroChina 601857",
+        "中国石化": "Sinopec 600028",
+        "中国神华": "China Shenhua 601088",
+        "中芯国际": "SMIC 688981",
+        "海康威视": "Hikvision 002415",
+        "美的集团": "Midea 000333",
+        "格力电器": "Gree 000651",
+        "万科": "Vanke 000002",
+        "保利发展": "Poly 600048",
+        "恒瑞医药": "Hengrui Medicine 600276",
+        "药明康德": "WuXi AppTec 603259",
+        "隆基绿能": "LONGi 601012",
+        "阳光电源": "Sungrow 300274",
+        "中兴通讯": "ZTE 000063",
+        "科大讯飞": "iFlytek 002230",
+        "三一重工": "Sany 600031",
+        "海尔智家": "Haier 600690",
+        "长城汽车": "Great Wall Motor 601633",
+        "蔚来": "NIO NIO.US",
+        "小鹏汽车": "XPeng XPEV.US",
+        "理想汽车": "Li Auto LI.US",
+        "拼多多": "Pinduoduo PDD.US",
+        "网易有道": "NetEase Youdao DAO.US",
+    }
+
+    # 精确匹配
+    if company in hints:
+        return hints[company]
+
+    # 模糊匹配——检查公司名是否包含已知的公司关键词
+    for key, hint in hints.items():
+        if key in company or company in key:
+            return hint
+
+    return ""  # 未知公司，只用中文搜索
+
+
 def parallel_search(company: str) -> dict[str, list[SearchResult]]:
     """
     并行搜索三个维度的信息。
@@ -288,10 +744,12 @@ def parallel_search(company: str) -> dict[str, list[SearchResult]]:
     返回值：
         {"fundamentals": [...], "news": [...], "risks": [...]}
     """
+    # 搜索关键词：纯中文自然搜索，cn.bing.com 的中文分词靠自然语言理解，
+    # 加了英文反而容易混淆。对于独特名称（如"比亚迪"）效果最好。
     queries = {
-        "fundamentals": f"{company} 公司基本面 主营业务 财报 2025 2026",
-        "news": f"{company} 最新动态 新闻 2026",
-        "risks": f"{company} 风险 负面 亏损 诉讼 争议",
+        "fundamentals": f"{company} 2025年 财报 营收 净利润 主营业务",
+        "news": f"{company} 最新 新闻 动态 公告 2025 2026",
+        "risks": f"{company} 风险 亏损 诉讼 争议 负面",
     }
 
     results: dict[str, list[SearchResult]] = {}
@@ -379,7 +837,12 @@ SYSTEM_PROMPT = """# Role（角色）
 
 def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchResult]]) -> str:
     """
-    把搜索结果拼装成给 LLM 的 prompt。
+    把搜索结果 + 实时财务数据拼装成给 LLM 的 prompt。
+
+    数据来源优先级：
+      1. 东方财富实时行情 ———— 市值、PE、营收、ROE 等硬指标
+      2. Bing 网络搜索 ———— 新闻、动态、研报等软信息
+      3. LLM 训练知识 ———— 作为补充（明确标注）
 
     参数：
         company: 公司名称
@@ -388,6 +851,14 @@ def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchRe
     返回值：
         拼接好的 prompt 字符串
     """
+    # ——— 获取实时财务数据 ———
+    stock_info = _lookup_stock_code(company)
+    financial_text = ""
+    if stock_info:
+        fin_data = _get_financial_data(stock_info["secid"])
+        financial_text = _format_financial_data(fin_data)
+        print(f"   📊 获取到 {stock_info['name']}({stock_info['code']}) 实时行情数据")
+
     # 把搜索结果格式化为文本
     def format_results(results: list[SearchResult], label: str) -> str:
         if not results:
@@ -404,9 +875,33 @@ def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchRe
     news = format_results(search_results.get("news", []), "最新动态/新闻")
     risks = format_results(search_results.get("risks", []), "风险/负面信息")
 
-    user_prompt = f"""请分析以下公司：**{company}**
+    # 评估外部数据质量
+    total_web_results = sum(len(v) for v in search_results.values())
+    has_financial_data = bool(financial_text and "未获取到" not in financial_text)
 
-以下是网络搜索获取的信息：
+    if not has_financial_data and total_web_results == 0:
+        # 两个数据源都不可用 → 纯 LLM 训练知识模式
+        user_prompt = f"""请分析以下公司：**{company}**
+
+⚠️ 注意：当前无法获取该公司的实时行情数据和网络搜索信息。
+请完全基于你的训练知识进行分析，但必须遵守以下规则：
+
+1. 在报告开头明确标注：「⚠️ 数据说明：本次分析基于 AI 训练知识，未获取到实时市场数据。
+   请通过东方财富(eastmoney.com)、巨潮资讯(cninfo.com.cn)等渠道核实最新信息。」
+2. 不要编造具体的财务数字（如"营收1234亿元"）。如果训练知识中有大致数据可以说"约"。
+3. 公司概况、业务描述、行业分析可以使用训练知识。
+4. 风险分析中可以提及行业共性风险，但不要编造具体事件。
+
+请严格按照输出格式要求生成报告。"""
+    else:
+        # 有外部数据 → 数据驱动分析模式
+        user_prompt = f"""请分析以下公司：**{company}**
+
+## 实时行情数据（来源：东方财富，数据实时更新）
+
+{financial_text if financial_text else "（未获取到实时行情数据）"}
+
+## 网络搜索信息
 
 {fundamentals}
 
@@ -414,10 +909,12 @@ def _build_analysis_prompt(company: str, search_results: dict[str, list[SearchRe
 
 {risks}
 
-请根据以上信息，严格按照输出格式要求，生成一份专业的金融分析简报。
-如果搜索结果为空，请基于你的训练数据中关于该公司的知识进行分析，
-但必须标注「以下分析基于 AI 训练知识，可能存在时效性不足的问题」。
-如果搜索结果存在，则严格基于搜索结果，不编造信息。"""
+请根据以上信息生成专业的金融分析简报。注意：
+- **优先使用实时行情数据中的财务指标**（市值、PE、营收、ROE 等），这些是准确数据。
+- 网络搜索结果可用于补充新闻动态和风险信息。
+- 如果网络搜索信息不充分，用你的训练知识补充公司背景和行业分析。
+- 无论哪种情况，都不要编造不存在的财务数据或新闻。不确定的信息标注「公开信息中暂未核实」。
+- 不要给出「买入/卖出/持有」等投资建议。"""
 
     return user_prompt
 

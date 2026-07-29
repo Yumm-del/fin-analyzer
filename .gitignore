@@ -10,6 +10,10 @@ __pycache__/
 reports/*.md
 analysis_journal.json
 
+# Streamlit
+.streamlit/secrets.toml
+*.streamlit/secrets*
+
 # IDE
 .idea/
 .vscode/

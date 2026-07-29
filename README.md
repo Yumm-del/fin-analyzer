@@ -5,6 +5,25 @@
 
 ---
 
+## 🌐 在线体验（Web 版）
+
+如果你不想安装任何东西，可以直接在浏览器中使用：
+
+👉 **公网地址**：[部署后填入你的 Hugging Face / Streamlit Cloud 地址]
+
+也可以本地启动 Web 版：
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+浏览器自动打开 `http://localhost:8501`，即可使用完整功能。
+
+> Web 版与 CLI 版共享同一套核心引擎，只是换了一个更友好的界面形态。
+
+---
+
 ## 一句话介绍
 
 输入「比亚迪」或「002594」，Agent 会：
@@ -14,7 +33,7 @@
 
 ---
 
-## 🚀 快速开始
+## 🚀 CLI 版快速开始
 
 ```bash
 # 1. 克隆仓库
@@ -24,8 +43,11 @@ cd fin-analyzer
 # 2. 安装依赖
 pip install -r requirements.txt
 
-# 3. 运行
+# 3. 运行 CLI 版（终端交互）
 python fin_analyzer.py
+
+# 4. 或运行 Web 版（浏览器交互）
+streamlit run app.py
 ```
 
 首次运行前，在项目根目录创建 `.env` 文件：
@@ -36,14 +58,18 @@ DEEPSEEK_API_KEY=你的密钥
 
 获取地址：https://platform.deepseek.com（免费注册即送额度）
 
+> Web 版也可以在侧边栏直接输入 API Key，无需创建 .env 文件。
+
 ---
 
 ## 📋 功能
 
-- 🔍 **智能搜索** — 自动搜索三个维度的网络信息，并行执行
-- 🤖 **LLM 分析** — 调用 DeepSeek 进行深度分析，prompt 中包含防幻觉、来源标注等设计
+- 🔍 **智能搜索** — 自动搜索三个维度的网络信息（基本面/动态/风险），并行执行
+- 🤖 **LLM 分析** — 调用 DeepSeek 进行深度分析，内置防幻觉、来源标注等产品设计
 - 📊 **结构化报告** — 固定四模块输出（公司概况、近期动态、风险提示、一句话总结）
-- 📁 **自动存档** — 报告保存为 Markdown 文件，同时写入 JSON 分析日记
+- 📁 **自动存档** — 报告保存为 Markdown，同时写入 JSON 分析日记
+- 🌐 **双界面** — CLI 版（终端）给技术用户；Web 版（浏览器）给非技术用户
+- 📖 **历史回溯** — Web 版支持查看、搜索、下载过往分析记录
 
 ---
 
@@ -66,9 +92,10 @@ LLM 会编造不存在的财务数据。解决方案：prompt 中强制要求每
 
 | 技能 | 具体应用 |
 |------|---------|
-| Python | 主语言，约 600 行 |
-| duckduckgo_search | 免费网络搜索（无需 API Key） |
-| openai SDK | 调用 DeepSeek API |
+| Python | 主语言，CLI 版约 600 行 + Web 版约 500 行 |
+| Streamlit | Web UI 框架（浏览器端交互） |
+| DuckDuckGo | 免费网络搜索（直接 HTTP 请求，无需 API Key） |
+| openai SDK | 调用 DeepSeek API（兼容 OpenAI 格式） |
 | concurrent.futures | 多线程并行搜索加速 |
 | dataclass + JSON | 数据模型 & 分析日记持久化 |
 | Prompt Engineering | 角色设定、约束条件、输出模板 |
@@ -79,12 +106,20 @@ LLM 会编造不存在的财务数据。解决方案：prompt 中强制要求每
 
 ```
 fin-analyzer/
-├── fin_analyzer.py          ← 主程序
+├── fin_analyzer.py          ← CLI 版主程序（核心引擎）
+├── app.py                   ← Web 版主程序（Streamlit 界面）
 ├── requirements.txt         ← Python 依赖
 ├── README.md               ← 项目文档
-├── .gitignore              ← 排除 .env 等敏感文件
+├── DEPLOY.md               ← 部署指南（HuggingFace / Streamlit Cloud）
+├── .gitignore              ← 排除 .env、报告文件等
+├── .streamlit/
+│   └── config.toml         ← Streamlit 主题配置
 ├── versions/               ← 历史版本
 │   └── v0.1_basic.py       ← 第一版
+├── demo/
+│   ├── sample_report.md    ← 示例分析报告
+│   └── pitfalls.md         ← 踩坑记录（产品思考）
+├── portfolio/              ← 作品集材料（PRD、竞品体验报告等）
 └── reports/                ← 生成的分析报告存档
 ```
 
@@ -92,9 +127,19 @@ fin-analyzer/
 
 ## 🔄 版本演进
 
+<<<<<<< HEAD
 - **v0.1** — 搜索 + LLM 分析（核心链路）
 - **v0.2（计划）** — 并行搜索优化 + 结构化报告
 - **v0.3（计划）** — 多公司对比 + 数据可视化
+=======
+```
+v0.1 ✅ ────────→ v0.2 ✅ ────────→ v0.3 🔜 ────→ v1.0 🎯
+CLI 基础版       Web 界面          多公司对比       完整产品
+搜索 + LLM       Streamlit         + 数据可视化    用户系统
+终端预览         历史记录           横向对比         + PDF 导出
+Markdown 存档    报告下载           风险雷达图       + 行业分析
+```
+>>>>>>> e18f7aa3a4b02821b0537e4d4a874995ab755072
 
 ---
 

@@ -1,0 +1,38 @@
+# Streamlit 主题配置
+# 参考：https://docs.streamlit.io/develop/api-reference/configuration/config.toml
+#
+# PM 视角：保持专业、简洁的视觉风格，符合金融工具的调性。
+# 主色调选用深蓝（#1e40af），契合金融行业的稳重感。
+
+[theme]
+# 基础主题：light（浅色）更符合金融分析的阅读习惯
+base="light"
+
+# 主色调：深蓝 — 金融行业的经典色，传递「可信赖」感
+primaryColor="#1e40af"
+
+# 背景色：略灰的白色 — 比纯白更护眼
+backgroundColor="#fafbfc"
+
+# 次要背景色：用于卡片、侧边栏等
+secondaryBackgroundColor="#f1f5f9"
+
+# 文字色：深灰 — 比纯黑更柔和
+textColor="#1e293b"
+
+# 字体：优先使用系统自带中文字体
+font="sans serif"
+
+[server]
+# 开发模式下自动重载
+runOnSave=true
+
+# 监听所有网络接口（用于本地局域网测试）
+# 注释掉则只监听 localhost
+# headless=true
+
+[browser]
+# 启动时自动打开浏览器
+serverAddress="localhost"
+serverPort=8501
+gatherUsageStats=false
