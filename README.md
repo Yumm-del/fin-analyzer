@@ -1,6 +1,6 @@
 # 🤖 AI 金融分析 Agent
 
-> 📋 [查看作品集](portfolio/README.md)
+> 📋 [查看作品集](https://github.com/Yumm-del/portfolio)
 
 > Python 手写的 AI 金融分析工具：输入公司名，自动搜索网络信息 + 调用 DeepSeek 大模型，生成结构化分析报告。
 > 这是我从 AI 产品经理视角出发，独立设计并实现的一个「AI + 金融」产品原型。
@@ -121,8 +121,8 @@ fin-analyzer/
 ├── demo/
 │   ├── sample_report.md    ← 示例分析报告
 │   └── pitfalls.md         ← 踩坑记录（产品思考）
-├── portfolio/              ← 作品集材料（PRD、竞品体验报告等）
 └── reports/                ← 生成的分析报告存档
+<!-- 作品集已移至独立仓库：https://github.com/Yumm-del/portfolio -->
 ```
 
 ---
