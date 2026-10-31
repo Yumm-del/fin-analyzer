@@ -1,0 +1,132 @@
+{
+  "kind": "offline_contract",
+  "model_called": false,
+  "total": 20,
+  "passed": 20,
+  "checks": [
+    {
+      "id": "C01",
+      "category": "coverage",
+      "passed": true,
+      "description": "四模块输出约定存在"
+    },
+    {
+      "id": "C02",
+      "category": "quota",
+      "passed": true,
+      "description": "不要求凑满三条风险"
+    },
+    {
+      "id": "C03",
+      "category": "quota",
+      "passed": true,
+      "description": "不要求凑满新闻数量"
+    },
+    {
+      "id": "C04",
+      "category": "trust",
+      "passed": true,
+      "description": "外部资料不作为指令"
+    },
+    {
+      "id": "C05",
+      "category": "fallback",
+      "passed": true,
+      "description": "系统层明确降级背景的边界"
+    },
+    {
+      "id": "C06",
+      "category": "timeliness",
+      "passed": true,
+      "description": "记录生成时间"
+    },
+    {
+      "id": "C07",
+      "category": "timeliness",
+      "passed": true,
+      "description": "区分报告时间与资料时间"
+    },
+    {
+      "id": "C08",
+      "category": "mapping",
+      "passed": true,
+      "description": "不把未核验字段宣称为准确数据"
+    },
+    {
+      "id": "C09",
+      "category": "fallback",
+      "passed": true,
+      "description": "无外部证据时不以约数掩盖未知"
+    },
+    {
+      "id": "C10",
+      "category": "provenance",
+      "passed": true,
+      "description": "各种场景具有明确来源模式"
+    },
+    {
+      "id": "C11",
+      "category": "trust",
+      "passed": true,
+      "description": "用结构化区块区分资料与指令（不等于完整防注入）"
+    },
+    {
+      "id": "C12",
+      "category": "coverage",
+      "passed": true,
+      "description": "保留全部输入来源链接"
+    },
+    {
+      "id": "C13",
+      "category": "coverage",
+      "passed": true,
+      "description": "保留历史资料日期"
+    },
+    {
+      "id": "C14",
+      "category": "coverage",
+      "passed": true,
+      "description": "保留冲突证据，交由生成与人工复核判断"
+    },
+    {
+      "id": "C15",
+      "category": "execution",
+      "passed": true,
+      "description": "空白模型响应应判为失败"
+    },
+    {
+      "id": "C16",
+      "category": "execution",
+      "passed": true,
+      "description": "模型请求有有限超时"
+    },
+    {
+      "id": "C17",
+      "category": "execution",
+      "passed": true,
+      "description": "模型重试有界"
+    },
+    {
+      "id": "C18",
+      "category": "provenance",
+      "passed": true,
+      "description": "程序添加来源说明，不只依赖模型遵守"
+    },
+    {
+      "id": "C19",
+      "category": "execution",
+      "passed": true,
+      "description": "接口空结果时不打印获取成功"
+    },
+    {
+      "id": "C20",
+      "category": "interface",
+      "passed": true,
+      "description": "界面不展示密钥片段"
+    }
+  ],
+  "timestamp_utc": "2026-10-22T09:29:31+00:00",
+  "revision": "working-tree",
+  "source_sha256": "71de0b661f25deeee7d72a48a821cfbbd593e96679e0e9d469b6d32e67a19988",
+  "dataset_sha256": "68bfef45d853895877ce4073b4b1f4c9e1d5a680de4e81fbde46328219895f49"
+}

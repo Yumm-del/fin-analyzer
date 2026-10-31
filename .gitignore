@@ -22,3 +22,6 @@ analysis_journal.json
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 真实模型响应与试用记录默认留在本地
+evals/runs/

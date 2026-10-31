@@ -4,9 +4,9 @@
 
 ---
 
-## 方式一：Hugging Face Spaces（推荐 — 支持 Gitee）
+## 方式一：Hugging Face Spaces（推荐）
 
-Hugging Face Spaces 支持从任意公开 Git 仓库部署，包括 Gitee。
+Hugging Face Spaces 支持从任意公开 Git 仓库部署，包括 GitHub。
 
 ### 步骤
 
@@ -19,7 +19,7 @@ Hugging Face Spaces 支持从任意公开 Git 仓库部署，包括 Gitee。
    - **SDK Version**: 选最新稳定版
 4. 点击 **Create Space**
 5. 创建后，在 Space 页面选择 **Settings** → 找到 **Repository** 部分
-6. 填入你的 Gitee 仓库地址：`https://gitee.com/yumm-del--pure-delight/fin-analyzer.git`
+6. 填入你的 GitHub 仓库地址：`https://github.com/Yumm-del/fin-analyzer.git`
 7. 在 Settings → **Repository secrets** 中添加：
    ```
    DEEPSEEK_API_KEY = sk-你的密钥
@@ -29,7 +29,7 @@ Hugging Face Spaces 支持从任意公开 Git 仓库部署，包括 Gitee。
 
 ### 优势
 - ✅ 免费
-- ✅ 支持 Gitee 仓库（不需要迁移到 GitHub）
+- ✅ 不需要单独部署服务器，绑定仓库即可
 - ✅ 自动 HTTPS
 - ✅ 不使用时自动休眠（节省资源）
 
@@ -72,7 +72,7 @@ Streamlit 官方云服务，但要求代码托管在 GitHub。
 
 ```bash
 # 1. 在服务器上克隆代码
-git clone https://gitee.com/yumm-del--pure-delight/fin-analyzer.git
+git clone https://github.com/Yumm-del/fin-analyzer.git
 cd fin-analyzer
 
 # 2. 安装依赖

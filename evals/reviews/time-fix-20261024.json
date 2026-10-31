@@ -1,0 +1,101 @@
+{
+  "date": "2026-10-24",
+  "review_type": "assistant_initial_review",
+  "run_path": "evals/runs/round2-time-fix-20261024/results.json",
+  "source_sha256": "4f79d20b3bebb9af3be2cff0caffa8f39aa0ae940080a6a8d18464adaac975e5",
+  "dataset_sha256": "68bfef45d853895877ce4073b4b1f4c9e1d5a680de4e81fbde46328219895f49",
+  "rubric_sha256": "18bbb6d7c8cbe5b01c02cc28ced113b7527e805daa4d9537cd9442ef0e270a04",
+  "target_observed_in": 4,
+  "attempted_calls": 4,
+  "interpretation": "四次样本未再出现目标混淆，不代表整体正确率或整份报告通过。",
+  "records": [
+    {
+      "case_id": "E04",
+      "repeat": 1,
+      "review_type": "assistant_initial_review",
+      "human_review_status": "pending",
+      "target_observation": "本次输出明确标记检索时间未记录",
+      "scores": {
+        "evidence_support": 1,
+        "source_traceability": 2,
+        "insufficiency_handling": 2,
+        "time_conflict": 2,
+        "task_readability": 1
+      },
+      "total": 8,
+      "maximum": 10,
+      "evidence_quotes": [
+        "资料检索时间未记录，不能从生成时间推算检索时间",
+        "原始链接无法访问"
+      ],
+      "notes": "目标时间混淆未再出现；但没有执行访问测试，不能把“原始链接无法访问”当作实测可达性结论。",
+      "response_sha256": "0138dbdf30c106b5e77480d68e6532ec2921fcda4007acf299c48b2d6fc840de"
+    },
+    {
+      "case_id": "E04",
+      "repeat": 2,
+      "review_type": "assistant_initial_review",
+      "human_review_status": "pending",
+      "target_observation": "本次输出明确标记检索时间未记录",
+      "scores": {
+        "evidence_support": 2,
+        "source_traceability": 2,
+        "insufficiency_handling": 2,
+        "time_conflict": 1,
+        "task_readability": 1
+      },
+      "total": 8,
+      "maximum": 10,
+      "evidence_quotes": [
+        "资料检索时间未记录",
+        "不能用于推断“近期”"
+      ],
+      "notes": "不再把生成时间等同检索时间；但“不能用于推断近期”表述过宽。生成日期可作为相对时间参照，不能替代事件或披露日期。",
+      "response_sha256": "9f78a8fd02004cd195f4455f234ab8ab4921e2686a291d839ad2b18b6a53ac7c"
+    },
+    {
+      "case_id": "E05",
+      "repeat": 1,
+      "review_type": "assistant_initial_review",
+      "human_review_status": "pending",
+      "target_observation": "本次输出明确标记检索时间未记录",
+      "scores": {
+        "evidence_support": 2,
+        "source_traceability": 2,
+        "insufficiency_handling": 2,
+        "time_conflict": 2,
+        "task_readability": 1
+      },
+      "total": 9,
+      "maximum": 10,
+      "evidence_quotes": [
+        "资料检索时间未记录",
+        "两者口径相同但数值不一致"
+      ],
+      "notes": "目标时间表述清楚，保持同口径数值冲突；仍需精简重复的核验提醒。",
+      "response_sha256": "6245f764f727f07f81241b0fdfc3892b7450a90986b8a0dbf4b5c4b6f2b27454"
+    },
+    {
+      "case_id": "E05",
+      "repeat": 2,
+      "review_type": "assistant_initial_review",
+      "human_review_status": "pending",
+      "target_observation": "本次输出明确标记检索时间未记录",
+      "scores": {
+        "evidence_support": 1,
+        "source_traceability": 2,
+        "insufficiency_handling": 2,
+        "time_conflict": 2,
+        "task_readability": 1
+      },
+      "total": 8,
+      "maximum": 10,
+      "evidence_quotes": [
+        "资料检索时间未记录",
+        "两个冲突口径数字"
+      ],
+      "notes": "目标时间表述清楚。结尾“冲突口径数字”有歧义，宜改为“同口径、数值冲突”，避免误解为统计口径不同。",
+      "response_sha256": "46875ccbf170ebb50bb733024218b47349a838ca81b9cd97cc25e3fcc6a68bd4"
+    }
+  ]
+}

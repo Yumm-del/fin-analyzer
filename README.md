@@ -26,6 +26,18 @@ streamlit run app.py
 
 ---
 
+## 评测与迭代记录
+
+当前实现为单轮检索分析工作流。已补充固定合成场景、程序契约检查、真实模型响应记录与人工评分标准。
+程序约束通过不等于模型事实正确，也不等于真实用户运营效果。
+
+- [评测入口与运行方法](evals/README.md)
+- [人工评审标准](evals/rubric.md)
+- [问题与迭代清单](evals/issues.md)
+- [真实试用说明与空白记录](evals/trial.md)
+- [开源调研与实施选择](evals/research.md)
+
+
 ## 一句话介绍
 
 输入「比亚迪」或「002594」，Agent 会：
@@ -39,7 +51,7 @@ streamlit run app.py
 
 ```bash
 # 1. 克隆仓库
-git clone https://gitee.com/yumm-del--pure-delight/fin-analyzer.git
+git clone https://github.com/Yumm-del/fin-analyzer.git
 cd fin-analyzer
 
 # 2. 安装依赖
@@ -80,7 +92,7 @@ DEEPSEEK_API_KEY=你的密钥
 这个 Agent 从产品视角出发，重点解决了三个问题：
 
 ### 1. 防幻觉机制
-LLM 会编造不存在的财务数据。解决方案：prompt 中强制要求每条信息标注来源，搜索不到的信息标注「公开信息中暂未查到」。
+LLM 可能生成无依据的财务数据。本项目通过来源约束、资料不足说明与固定场景评测降低风险，仍须人工检查事实与来源是否对应；这些措施不保证消除幻觉。
 
 ### 2. 输出一致性
 如果不约束格式，每次分析的结果结构会完全不同。解决方案：用一个详细的 Markdown 模板作为 system prompt 的输出约束。

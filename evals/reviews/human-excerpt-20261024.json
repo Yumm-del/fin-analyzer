@@ -1,0 +1,28 @@
+{
+  "records": [
+    {
+      "review_id": "E05-time-fix-r1-conflict-excerpt",
+      "reviewer": "项目负责人（当前对话用户）",
+      "review_date": "2026-10-24",
+      "review_type": "human_excerpt_verdict",
+      "case_id": "E05",
+      "repeat": 1,
+      "run_path": "evals\\runs\\round2-time-fix-20261024\\results.json",
+      "source_sha256": "4f79d20b3bebb9af3be2cff0caffa8f39aa0ae940080a6a8d18464adaac975e5",
+      "response_sha256": "6245f764f727f07f81241b0fdfc3892b7450a90986b8a0dbf4b5c4b6f2b27454",
+      "scope": "只复核所展示的数据冲突处理片段，不代表完整报告评审",
+      "shown_inputs": [
+        "2025年付费客户100家",
+        "2025年付费客户90家",
+        "未说明差异原因"
+      ],
+      "shown_excerpt": "两个来源数值冲突，现有资料不足以判定哪一个准确，暂不能作为公司正式披露数据采纳。",
+      "user_reply": "通过",
+      "verdict": "pass",
+      "user_reason": null,
+      "numeric_score": null,
+      "complete_report_review": false,
+      "actual_product_trial": false
+    }
+  ]
+}

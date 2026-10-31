@@ -442,7 +442,7 @@ def execute_analysis(company: str, fast_mode: bool = True):
             total_results = sum(len(v) for v in search_results.values())
 
         if fast_mode:
-            st.write("   ⚡ 使用 LLM 训练数据分析（训练数据截止 2025 年底）")
+            st.write("   ⚡ 使用模型背景知识，训练知识截止时间未核实；请核对原始资料")
         elif total_results > 0:
             st.write(f"   ✅ 搜索完成！耗时 {search_duration:.1f}s，获取 {total_results} 条结果")
         else:
@@ -462,7 +462,7 @@ def execute_analysis(company: str, fast_mode: bool = True):
             )
             return
 
-        st.write(f"   🔑 使用 Key: {current_key[:10]}...（已脱敏）")
+        st.write("   🔑 API 配置已就绪")
         report = fa.analyze_company(company, search_results)
 
         if report is None:
@@ -741,7 +741,7 @@ def render_about_page():
     st.markdown("""
     <div class="footer">
         Fin Analyzer · AI 驱动的金融分析工具 · Built with ❤️<br>
-        <a href="https://gitee.com/yumm-del--pure-delight/fin-analyzer" target="_blank">
+        <a href="https://github.com/Yumm-del/fin-analyzer" target="_blank">
             Gitee 仓库
         </a>
         ·
