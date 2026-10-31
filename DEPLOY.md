@@ -41,13 +41,7 @@ Streamlit 官方云服务，但要求代码托管在 GitHub。
 
 ### 步骤
 
-1. 先将 Gitee 仓库镜像到 GitHub：
-   ```bash
-   # 在 GitHub 上新建一个空仓库 fin-analyzer
-   # 然后在本地执行：
-   git remote add github https://github.com/<你的用户名>/fin-analyzer.git
-   git push github master
-   ```
+1. 仓库已在 GitHub（`Yumm-del/fin-analyzer`），无需额外镜像
 2. 访问 [share.streamlit.io](https://share.streamlit.io)，用 GitHub 登录
 3. 点击 **New app**
 4. 选择仓库、分支（master）、主文件路径（app.py）

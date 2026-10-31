@@ -742,7 +742,7 @@ def render_about_page():
     <div class="footer">
         Fin Analyzer · AI 驱动的金融分析工具 · Built with ❤️<br>
         <a href="https://github.com/Yumm-del/fin-analyzer" target="_blank">
-            Gitee 仓库
+            GitHub 仓库
         </a>
         ·
         <a href="https://platform.deepseek.com" target="_blank">DeepSeek API</a>
